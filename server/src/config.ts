@@ -30,6 +30,17 @@ const envSchema = z.object({
   // Limits
   MAX_FILE_SIZE_MB: z.coerce.number().default(50),
 
+  // Soroban registry
+  SOROBAN_RPC_URL: z
+    .string()
+    .default("https://soroban-testnet.stellar.org"),
+  REGISTRY_CONTRACT_ID: z
+    .string()
+    .min(1, "REGISTRY_CONTRACT_ID is required"),
+  REGISTRY_SECRET_KEY: z
+    .string()
+    .min(1, "REGISTRY_SECRET_KEY (deployer / owner secret) is required"),
+
   // Verification
   VERIFICATION_PRICE: z.string().default("0.10"),
 });
