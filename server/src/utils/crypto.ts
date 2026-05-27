@@ -7,3 +7,7 @@ export function generateApiKey(): string {
 export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
+
+export function hashContentUrl(url: string): string {
+  return createHash("sha256").update(url).digest("hex");
+}

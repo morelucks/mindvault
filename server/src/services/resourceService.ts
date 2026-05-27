@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { resources, publishers, verifications } from "../db/schema.js";
 import { uploadFile, deleteFile } from "../storage/supabaseStorage.js";
+import { hashContentUrl } from "../utils/crypto.js";
 
 export async function createFileResource(data: {
   publisherId: string;
@@ -60,6 +61,7 @@ export async function createLinkResource(data: {
       walletAddress: data.walletAddress,
       resourceType: "link",
       externalUrl: data.externalUrl,
+      contentHash: hashContentUrl(data.externalUrl),
     })
     .returning();
 
