@@ -1,4 +1,4 @@
-import { Keypair, Networks } from "@stellar/stellar-sdk";
+import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
 import { Client, Errors, type Resource } from "@mindvault/registry-client";
 import { config } from "../config.js";
 
@@ -82,9 +82,13 @@ export async function transferOwnership(id: string, newCreator: string): Promise
   return tx.toXDR();
 }
 
-export async function prepareRegister(
-  id: string,
+/**
+ * Build an unsigned register transaction for the resource creator to sign.
+ * Returns the transaction XDR string.
+ */
+export async function buildRegisterTx(
   creator: string,
+  id: string,
   priceUsdc: string,
   metadata: string
 ): Promise<string> {
@@ -98,4 +102,108 @@ export async function prepareRegister(
     { simulate: false }
   );
   return tx.toXDR();
+}
+
+/**
+ * Submit a creator-signed XDR to Soroban RPC and poll for the result.
+ * Returns the transaction hash and success/failure status.
+ */
+export async function submitSignedTx(signedXdr: string): Promise<{
+  txHash: string;
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Parse the signed transaction
+    const transaction = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+    
+    // Submit to Soroban RPC
+    const server = registryClient.options.rpcUrl;
+    const response = await fetch(server, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'sendTransaction',
+        params: {
+          transaction: signedXdr,
+        },
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (result.error) {
+      return {
+        txHash: '',
+        success: false,
+        error: result.error.message || 'Transaction submission failed',
+      };
+    }
+
+    const txHash = result.result.hash;
+    
+    // Poll for transaction result with timeout
+    const maxAttempts = 30; // 30 seconds timeout
+    const pollInterval = 1000; // 1 second
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      const statusResponse = await fetch(server, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTransaction',
+          params: {
+            hash: txHash,
+          },
+        }),
+      });
+
+      const statusResult = await statusResponse.json();
+      
+      if (statusResult.error) {
+        // Transaction not found yet, continue polling
+        continue;
+      }
+
+      const status = statusResult.result.status;
+      
+      if (status === 'SUCCESS') {
+        return {
+          txHash,
+          success: true,
+        };
+      } else if (status === 'FAILED') {
+        return {
+          txHash,
+          success: false,
+          error: 'Transaction failed on-chain',
+        };
+      }
+      // If status is still PENDING, continue polling
+    }
+    
+    // Timeout reached
+    return {
+      txHash,
+      success: false,
+      error: 'Transaction polling timeout - status unknown',
+    };
+    
+  } catch (error) {
+    return {
+      txHash: '',
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
 }

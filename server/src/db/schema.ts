@@ -59,6 +59,7 @@ export const resources = pgTable("resources", {
   verificationId: text("verification_id"),
   listed: boolean("listed").notNull().default(false),
   onchainStatus: onchainStatusEnum("onchain_status").notNull().default("none"),
+  onchainTxHash: text("onchain_tx_hash"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
