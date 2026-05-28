@@ -119,6 +119,10 @@ cd ../web
 pnpm dev          # Frontend on :5173
 ```
 
+## Operations
+
+- **Reconciliation**: see [docs/reconciliation.md](docs/reconciliation.md) — detects and reports drift between the DB and the on-chain vault registry; run with `pnpm reconcile` from `server/`.
+
 ## Testing the 402 Flow
 
 ```bash

@@ -12,7 +12,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "generate-wallet": "tsx scripts/generate-wallet.ts",
-    "e2e": "tsx scripts/e2e-test.ts"
+    "e2e": "tsx scripts/e2e-test.ts",
+    "reconcile": "tsx scripts/reconcile.ts"
   },
   "keywords": [
     "x402",
