@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm";
 import { config } from "../config.js";
 import {
   NETWORK_PASSPHRASE,
+  registryClient,
   setPrice,
   transferOwnership,
   buildRegisterTx,
