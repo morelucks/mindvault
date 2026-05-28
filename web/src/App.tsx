@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { EditPriceModal } from "./components/EditPriceModal.js";
 import { TransferOwnershipModal } from "./components/TransferOwnershipModal.js";
-import { fetchMyResources, registerOnChain, fetchRegistryStatus } from "./api/resources.js";
+import { RegisterModal } from "./components/RegisterModal.js";
+import { fetchMyResources, fetchRegistryStatus } from "./api/resources.js";
 
 interface Resource {
   id: string;
@@ -18,6 +19,7 @@ interface Resource {
 type ActiveModal =
   | { kind: "editPrice"; resource: Resource }
   | { kind: "transferOwnership"; resource: Resource }
+  | { kind: "register"; resource: Resource }
   | null;
 
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
@@ -26,8 +28,6 @@ export default function App() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [registryCount, setRegistryCount] = useState<number | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [registering, setRegistering] = useState<string | null>(null);
-  const [registerError, setRegisterError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (API_KEY) {
@@ -53,22 +53,11 @@ export default function App() {
     setActiveModal(null);
   }
 
-  async function handleRegister(resource: Resource) {
-    setRegistering(resource.id);
-    setRegisterError((prev) => ({ ...prev, [resource.id]: "" }));
-    try {
-      const updated = await registerOnChain(resource.id, API_KEY);
-      setResources((prev) =>
-        prev.map((r) => (r.id === updated.id ? { ...r, onchainStatus: updated.onchainStatus } : r))
-      );
-    } catch (err) {
-      setRegisterError((prev) => ({
-        ...prev,
-        [resource.id]: err instanceof Error ? err.message : "Registration failed",
-      }));
-    } finally {
-      setRegistering(null);
-    }
+  function handleRegistrationConfirmed(id: string, txHash: string) {
+    setResources((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, onchainStatus: "registered" } : r))
+    );
+    setActiveModal(null);
   }
 
   const needsRegistration = (r: Resource) =>
@@ -134,11 +123,10 @@ export default function App() {
               <div className="flex gap-1">
                 {API_KEY && needsRegistration(r) && (
                   <button
-                    onClick={() => handleRegister(r)}
-                    disabled={registering === r.id}
-                    className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => setActiveModal({ kind: "register", resource: r })}
+                    className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white hover:bg-amber-600"
                   >
-                    {registering === r.id ? "Registering…" : "Register on-chain"}
+                    Register on-chain
                   </button>
                 )}
                 {API_KEY && (
@@ -159,10 +147,6 @@ export default function App() {
                 )}
               </div>
             </div>
-
-            {registerError[r.id] && (
-              <p className="mt-2 text-xs text-red-600">{registerError[r.id]}</p>
-            )}
           </div>
         ))}
       </div>
@@ -184,6 +168,17 @@ export default function App() {
           onClose={() => setActiveModal(null)}
           onConfirmed={(newCreator) =>
             handleOwnershipConfirmed(activeModal.resource.id, newCreator)
+          }
+        />
+      )}
+
+      {activeModal?.kind === "register" && (
+        <RegisterModal
+          resourceId={activeModal.resource.id}
+          apiKey={API_KEY}
+          onClose={() => setActiveModal(null)}
+          onConfirmed={(txHash) =>
+            handleRegistrationConfirmed(activeModal.resource.id, txHash)
           }
         />
       )}

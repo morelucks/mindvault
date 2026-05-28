@@ -20,6 +20,47 @@ export async function registerOnChain(resourceId: string, apiKey: string): Promi
   return res.json();
 }
 
+export async function prepareRegisterTx(resourceId: string, apiKey: string): Promise<{
+  unsignedXdr: string;
+  networkPassphrase: string;
+  metadata: {
+    resourceId: string;
+    creator: string;
+    price: string;
+    title: string;
+    description?: string;
+  };
+}> {
+  const res = await fetch(`${API_BASE}/resources/${resourceId}/register/prepare`, {
+    headers: { "x-api-key": apiKey },
+  });
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(error ?? "Failed to prepare register transaction");
+  }
+  return res.json();
+}
+
+export async function submitRegisterTx(
+  resourceId: string,
+  signedXdr: string,
+  apiKey: string
+): Promise<{ id: string; onchainStatus: string; txHash: string }> {
+  const res = await fetch(`${API_BASE}/resources/${resourceId}/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({ signedXdr }),
+  });
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(error ?? "Failed to submit register transaction");
+  }
+  return res.json();
+}
+
 export async function prepareSetPrice(
   resourceId: string,
   price: string,
