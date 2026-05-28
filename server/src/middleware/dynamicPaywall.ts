@@ -11,6 +11,11 @@ import { resources } from "../db/schema.js";
 import type { Network } from "@x402/core/types";
 import type { RoutesConfig } from "@x402/core/server";
 import { config } from "../config.js";
+import {
+  getOnChainPrice,
+  normalizeUsdcPrice,
+  OnChainLookupError,
+} from "../lib/stellarRegistry.js";
 
 const network = config.NETWORK as Network;
 
@@ -50,6 +55,58 @@ export async function dynamicPaywall(
 
   if (!resource.listed) {
     res.status(404).json({ error: "Resource not listed" });
+    return;
+  }
+
+  // Validate the DB price against the on-chain registry before serving a 402.
+  // If they disagree we refuse the request rather than charge the wrong amount.
+  // TODO: cover this path with unit tests once a test runner is configured.
+  let onChainPrice: string;
+  let onChainCreator: string;
+  try {
+    const onChain = await getOnChainPrice(resourceId);
+    onChainPrice = onChain.price;
+    onChainCreator = onChain.creator;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const cause =
+      err instanceof OnChainLookupError && err.cause instanceof Error
+        ? err.cause.message
+        : undefined;
+    console.error("[paywall] on-chain price lookup failed", {
+      resourceId,
+      error: message,
+      cause,
+      timestamp: new Date().toISOString(),
+    });
+    res.status(503).json({
+      error: "chain_unavailable",
+      message: "Unable to verify resource price. Please try again later.",
+      resourceId,
+    });
+    return;
+  }
+
+  const dbPriceNormalized = normalizeUsdcPrice(resource.price);
+  if (dbPriceNormalized !== onChainPrice) {
+    const timestamp = new Date().toISOString();
+    console.warn(
+      `Price mismatch detected for resource ${resourceId}: DB=$${resource.price} chain=$${onChainPrice}`,
+      {
+        resourceId,
+        dbPrice: resource.price,
+        chainPrice: onChainPrice,
+        publisherWallet: resource.walletAddress,
+        onChainCreator,
+        timestamp,
+      }
+    );
+    res.status(409).json({
+      error: "price_mismatch",
+      message:
+        "Resource price is temporarily unavailable due to a configuration issue. Please try again later.",
+      resourceId,
+    });
     return;
   }
 
