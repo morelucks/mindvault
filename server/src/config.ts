@@ -53,6 +53,16 @@ const envSchema = z.object({
 
   // Verification
   VERIFICATION_PRICE: z.string().default("0.10"),
+
+  // Rate limiting (verify-content + publish)
+  RATE_LIMIT_VERIFY_IP_MAX: z.coerce.number().default(10),
+  RATE_LIMIT_VERIFY_IP_WINDOW_MS: z.coerce.number().default(60_000),
+  RATE_LIMIT_VERIFY_WALLET_MAX: z.coerce.number().default(5),
+  RATE_LIMIT_VERIFY_WALLET_WINDOW_MS: z.coerce.number().default(3_600_000),
+  RATE_LIMIT_PUBLISH_IP_MAX: z.coerce.number().default(20),
+  RATE_LIMIT_PUBLISH_IP_WINDOW_MS: z.coerce.number().default(60_000),
+  RATE_LIMIT_PUBLISH_WALLET_MAX: z.coerce.number().default(10),
+  RATE_LIMIT_PUBLISH_WALLET_WINDOW_MS: z.coerce.number().default(3_600_000),
 });
 
 const parsed = envSchema.safeParse(process.env);

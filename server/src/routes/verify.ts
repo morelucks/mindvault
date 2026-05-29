@@ -12,6 +12,10 @@ import { db } from "../db/client.js";
 import { resources, verifications } from "../db/schema.js";
 import { checkOriginality } from "../services/verificationService.js";
 import { config } from "../config.js";
+import {
+  verifyIpRateLimit,
+  verifyWalletRateLimit,
+} from "../middleware/rateLimiters.js";
 
 const router: RouterType = Router();
 const network = config.NETWORK as Network;
@@ -40,7 +44,12 @@ const verifyRoutes: RoutesConfig = {
 const verifyPaywall = paymentMiddleware(verifyRoutes, resourceServer);
 
 // POST /verify-content — AI originality check (x402 paywalled)
-router.post("/verify-content", verifyPaywall, async (req, res) => {
+router.post(
+  "/verify-content",
+  verifyIpRateLimit,
+  verifyPaywall,
+  verifyWalletRateLimit,
+  async (req, res) => {
   const { content, resourceId } = req.body;
 
   if (!content) {
@@ -74,7 +83,8 @@ router.post("/verify-content", verifyPaywall, async (req, res) => {
   }
 
   res.json(result);
-});
+  }
+);
 
 // GET /agent/status — public agent stats
 router.get("/agent/status", async (_req, res) => {

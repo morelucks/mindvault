@@ -122,6 +122,7 @@ pnpm dev          # Frontend on :5173
 ## Architecture
 
 - **[docs/architecture.md](docs/architecture.md)** — how x402 + USDC handles payment and how the vault-registry contract is the on-chain source of truth for ownership, price, and content integrity. Includes a full system diagram.
+- **[docs/x402-payment-troubleshooting.md](docs/x402-payment-troubleshooting.md)** — common x402 payment/sign failures and how to fix them (browser vs MCP, Explorer inspection).
 
 ## Operations
 

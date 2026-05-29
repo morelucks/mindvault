@@ -18,6 +18,10 @@ import { payments, resources } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { config } from "../config.js";
 import {
+  publishIpRateLimit,
+  publishWalletRateLimit,
+} from "../middleware/rateLimiters.js";
+import {
   NETWORK_PASSPHRASE,
   registryClient,
   setPrice,
@@ -25,7 +29,6 @@ import {
   buildRegisterTx,
   submitSignedTx,
   registryKeypair,
-  registryClient,
 } from "../services/registryClient.js";
 
 const router: RouterType = Router();
@@ -43,7 +46,13 @@ const linkSchema = z.object({
 });
 
 // POST /resources — publish a resource (authenticated)
-router.post("/resources", apiKeyAuth, upload.single("file"), async (req, res) => {
+router.post(
+  "/resources",
+  apiKeyAuth,
+  publishIpRateLimit,
+  publishWalletRateLimit,
+  upload.single("file"),
+  async (req, res) => {
   const publisher = req.publisher!;
 
   // File upload
@@ -93,7 +102,8 @@ router.post("/resources", apiKeyAuth, upload.single("file"), async (req, res) =>
     ...resource,
     accessUrl: `${config.BASE_URL}/resources/${resource.id}`,
   });
-});
+  }
+);
 
 // GET /resources — browse catalog (public)
 router.get("/resources", async (_req, res) => {

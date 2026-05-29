@@ -126,6 +126,14 @@ cp server/.env.example server/.env
 | `SUPABASE_STORAGE_BUCKET` | no | Storage bucket name, default `resources` |
 | `MAX_FILE_SIZE_MB` | no | Upload limit in MB, default `50` |
 | `VERIFICATION_PRICE` | no | USDC fee charged per verification, default `0.10` |
+| `RATE_LIMIT_VERIFY_IP_MAX` | no | Max verify requests per IP per window, default `10` |
+| `RATE_LIMIT_VERIFY_IP_WINDOW_MS` | no | Verify IP window in ms, default `60000` |
+| `RATE_LIMIT_VERIFY_WALLET_MAX` | no | Max verify requests per payer wallet per window, default `5` |
+| `RATE_LIMIT_VERIFY_WALLET_WINDOW_MS` | no | Verify wallet window in ms, default `3600000` |
+| `RATE_LIMIT_PUBLISH_IP_MAX` | no | Max publish requests per IP per window, default `20` |
+| `RATE_LIMIT_PUBLISH_IP_WINDOW_MS` | no | Publish IP window in ms, default `60000` |
+| `RATE_LIMIT_PUBLISH_WALLET_MAX` | no | Max publish requests per publisher wallet per window, default `10` |
+| `RATE_LIMIT_PUBLISH_WALLET_WINDOW_MS` | no | Publish wallet window in ms, default `3600000` |
 
 Generate the two Stellar wallets (platform + agent) with:
 
@@ -220,5 +228,30 @@ the approach.
 - All payments are testnet only; do not point this at mainnet.
 - Found a vulnerability? Open an issue describing the impact (avoid posting a
   working exploit publicly).
+
+### Secret scanning (gitleaks)
+
+Every push and pull request runs [gitleaks](https://github.com/gitleaks/gitleaks)
+via GitHub Actions. The scanner looks for Stellar secret keys (`S...`), Supabase
+service keys, API keys, and other common secret patterns.
+
+**If CI fails on your PR:**
+
+1. **Do not merge** until the finding is resolved.
+2. Identify the leaked value in the gitleaks job log (file + line).
+3. **Remove the secret from git history** if it was ever committed:
+   - If the PR is not merged yet, amend or rebase to drop the offending commit.
+   - If the secret reached `main`, rotate it immediately (generate a new Stellar
+     keypair, rotate Supabase service key, etc.) — removing it from git does not
+     revoke a key that was already exposed.
+4. Replace real values with placeholders in tracked files (see `server/.env.example`).
+5. Re-run locally before pushing:
+   ```bash
+   docker run --rm -v "$(pwd):/path" zricethezav/gitleaks:latest \
+     detect --source /path --config /path/.gitleaks.toml --verbose
+   ```
+
+Placeholder patterns in `server/.env.example` (e.g. `G...`, `S...`, `eyJ...`) are
+allowlisted in `.gitleaks.toml` and will not fail the scan.
 
 Happy building. ⚡
