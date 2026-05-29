@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { EditPriceModal } from "./components/EditPriceModal.js";
 import { TransferOwnershipModal } from "./components/TransferOwnershipModal.js";
 import { RegisterModal } from "./components/RegisterModal.js";
+import { ExplorerLink } from "./components/ExplorerLink.js";
 import { fetchMyResources, fetchRegistryStatus } from "./api/resources.js";
 
 interface Resource {
@@ -13,6 +14,7 @@ interface Resource {
   walletAddress: string;
   verificationStatus: string;
   onchainStatus: string;
+  onchainTxHash?: string;
   listed: boolean;
 }
 
@@ -92,7 +94,10 @@ export default function App() {
               <p className="mt-1 text-sm text-gray-500">by {r.publisherName}</p>
             )}
             <p className="mt-1 truncate text-xs text-gray-400" title={r.walletAddress}>
-              Owner: {r.walletAddress}
+              Owner:{" "}
+              <ExplorerLink type="account" value={r.walletAddress} className="text-gray-500">
+                {r.walletAddress}
+              </ExplorerLink>
             </p>
 
             <div className="mt-2 flex flex-wrap gap-1">
@@ -116,6 +121,15 @@ export default function App() {
               }`}>
                 {r.onchainStatus === "none" ? "not on-chain" : r.onchainStatus}
               </span>
+              {r.onchainStatus === "registered" && r.onchainTxHash && (
+                <ExplorerLink
+                  type="tx"
+                  value={r.onchainTxHash}
+                  className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium"
+                >
+                  View on Explorer ↗
+                </ExplorerLink>
+              )}
             </div>
 
             <div className="mt-3 flex items-center justify-between">
