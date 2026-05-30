@@ -117,6 +117,13 @@ make setup-usdc
 make dev
 ```
 
+To populate the catalog with sample resources for local browsing:
+
+```bash
+make seed                # DB only (idempotent, safe to re-run)
+make seed ONCHAIN=1      # also registers each resource on Stellar testnet
+```
+
 Set `VITE_API_URL=http://localhost:4021` when running the web app separately (e.g. in a `web/.env` file).
 
 ### Makefile targets
@@ -128,6 +135,7 @@ Set `VITE_API_URL=http://localhost:4021` when running the web app separately (e.
 | `make dev` | Start server and web app together |
 | `make dev-server` | Backend only on `:4021` |
 | `make dev-web` | Frontend only on `:5173` |
+| `make seed` | Seed the catalog with sample resources for local dev |
 | `make test` | Run unit tests |
 
 ### Local services
