@@ -1,4 +1,4 @@
-.PHONY: setup setup-usdc dev dev-server dev-web test install migrate wallets
+.PHONY: setup setup-usdc dev dev-server dev-web test install migrate wallets seed
 
 # MindVault local development entrypoints.
 # Prerequisites: Node.js 20+, pnpm, and a configured server/.env (see server/.env.example).
@@ -42,3 +42,8 @@ dev:
 
 test:
 	pnpm test
+
+# Populate the catalog with sample resources for local development.
+# Safe to re-run. Pass ONCHAIN=1 to also register on Stellar testnet.
+seed:
+	cd server && pnpm seed $(if $(ONCHAIN),--onchain,)
