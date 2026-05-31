@@ -72,6 +72,12 @@ Set `VAULT_REGISTRY_CONTRACT_ID` and `SOROBAN_RPC_URL` in the server `.env`
 (see [`server/.env.example`](../server/.env.example)) so the backend can
 record/read resources on this contract.
 
+### Emergency pause
+
+See [contract-registry-pause-decision.md](../docs/contract-registry-pause-decision.md)
+for the architecture spike on admin pause/unpause. **v1 does not implement pause**
+(creator-scoped writes + off-chain ops are sufficient for the current trust model).
+
 ### Ideas for contributors
 
 - A `list` / pagination method (current `get` is by id only).
