@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { EditPriceModal } from "./components/EditPriceModal.js";
 import { TransferOwnershipModal } from "./components/TransferOwnershipModal.js";
 import { RegisterModal } from "./components/RegisterModal.js";
 import { ExplorerLink } from "./components/ExplorerLink.js";
 import { Toast } from "./components/Toast.js";
+import { CatalogSearch } from "./components/CatalogSearch.js";
 import { useTheme } from "./hooks/useTheme.js";
-import { fetchMyResources, fetchRegistryStatus } from "./api/resources.js";
+import { fetchCatalog, fetchMyResources, fetchRegistryStatus } from "./api/resources.js";
+import type { CatalogFilters } from "./api/resources.js";
 
 interface Resource {
   id: string;
@@ -29,11 +31,20 @@ type ActiveModal =
 
 const API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
+const DEFAULT_FILTERS: CatalogFilters = {
+  search: "",
+  minPrice: "",
+  maxPrice: "",
+  verificationStatus: "all",
+  resourceType: "all",
+};
+
 export default function App() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [registryCount, setRegistryCount] = useState<number | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
   const { theme, toggleTheme } = useTheme();
 
   async function handleCopyUrl(url: string) {
@@ -49,16 +60,36 @@ export default function App() {
     if (API_KEY) {
       fetchMyResources(API_KEY).then(setResources).catch(console.error);
     } else {
-      fetch("/resources")
-        .then((r) => r.json())
-        .then(setResources)
-        .catch(console.error);
+      fetchCatalog().then(setResources).catch(console.error);
     }
 
     fetchRegistryStatus()
       .then((s) => setRegistryCount(s.resourceCount))
       .catch(console.error);
   }, []);
+
+  // Client-side filtering — works with the existing /resources endpoint
+  const filteredResources = useMemo(() => {
+    return resources.filter((r) => {
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        if (!r.title.toLowerCase().includes(q)) return false;
+      }
+      if (filters.verificationStatus && filters.verificationStatus !== "all") {
+        if (r.verificationStatus !== filters.verificationStatus) return false;
+      }
+      if (filters.resourceType && filters.resourceType !== "all") {
+        if (r.resourceType !== filters.resourceType) return false;
+      }
+      if (filters.minPrice) {
+        if (parseFloat(r.price) < parseFloat(filters.minPrice)) return false;
+      }
+      if (filters.maxPrice) {
+        if (parseFloat(r.price) > parseFloat(filters.maxPrice)) return false;
+      }
+      return true;
+    });
+  }, [resources, filters]);
 
   function handlePriceConfirmed(id: string, price: string) {
     setResources((prev) => prev.map((r) => (r.id === id ? { ...r, price } : r)));
@@ -116,8 +147,30 @@ export default function App() {
         </div>
       )}
 
+      {/* Search + filter bar (shown for public catalog only) */}
+      {!API_KEY && (
+        <CatalogSearch
+          filters={filters}
+          total={resources.length}
+          filtered={filteredResources.length}
+          onChange={setFilters}
+          onReset={() => setFilters(DEFAULT_FILTERS)}
+        />
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {resources.map((r) => (
+        {filteredResources.length === 0 && resources.length > 0 ? (
+          <div className="col-span-full py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+            No resources match your filters.{" "}
+            <button
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+              className="text-indigo-500 underline hover:text-indigo-700 dark:text-indigo-400"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          filteredResources.map((r) => (
           <div
             key={r.id}
             className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
@@ -214,7 +267,8 @@ export default function App() {
               </div>
             </div>
           </div>
-        ))}
+        ))
+        )}
       </div>
 
       {activeModal?.kind === "editPrice" && (
