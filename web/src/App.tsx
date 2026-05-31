@@ -3,6 +3,8 @@ import { EditPriceModal } from "./components/EditPriceModal.js";
 import { TransferOwnershipModal } from "./components/TransferOwnershipModal.js";
 import { RegisterModal } from "./components/RegisterModal.js";
 import { ExplorerLink } from "./components/ExplorerLink.js";
+import { Toast } from "./components/Toast.js";
+import { useTheme } from "./hooks/useTheme.js";
 import { fetchMyResources, fetchRegistryStatus } from "./api/resources.js";
 
 interface Resource {
@@ -16,6 +18,7 @@ interface Resource {
   onchainStatus: string;
   onchainTxHash?: string;
   listed: boolean;
+  accessUrl: string;
 }
 
 type ActiveModal =
@@ -30,6 +33,17 @@ export default function App() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [registryCount, setRegistryCount] = useState<number | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const { theme, toggleTheme } = useTheme();
+
+  async function handleCopyUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast("Resource URL copied to clipboard");
+    } catch {
+      setToast("Failed to copy URL");
+    }
+  }
 
   useEffect(() => {
     if (API_KEY) {
@@ -69,20 +83,33 @@ export default function App() {
     r.verificationStatus === "verified" && r.onchainStatus !== "registered";
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mb-6 flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-gray-900">MindVault</h1>
-        {registryCount !== null && (
-          <p className="text-sm text-gray-500">
-            Registry: <span className="font-semibold text-indigo-600">{registryCount}</span>{" "}
-            resource{registryCount !== 1 ? "s" : ""} registered on-chain
-          </p>
-        )}
+    <div className="min-h-screen bg-gray-50 p-8 dark:bg-gray-900">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">MindVault</h1>
+          {registryCount !== null && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Registry:{" "}
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                {registryCount}
+              </span>{" "}
+              resource{registryCount !== 1 ? "s" : ""} registered on-chain
+            </p>
+          )}
+        </div>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle light/dark theme"
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+        </button>
       </div>
 
       {API_KEY && resources.some(needsRegistration) && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
             {resources.filter(needsRegistration).length} resource(s) verified but not yet registered
             on-chain.
           </p>
@@ -91,12 +118,24 @@ export default function App() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {resources.map((r) => (
-          <div key={r.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p className="font-semibold text-gray-900">{r.title}</p>
-            {r.publisherName && <p className="mt-1 text-sm text-gray-500">by {r.publisherName}</p>}
-            <p className="mt-1 truncate text-xs text-gray-400" title={r.walletAddress}>
+          <div
+            key={r.id}
+            className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+          >
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{r.title}</p>
+            {r.publisherName && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">by {r.publisherName}</p>
+            )}
+            <p
+              className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500"
+              title={r.walletAddress}
+            >
               Owner:{" "}
-              <ExplorerLink type="account" value={r.walletAddress} className="text-gray-500">
+              <ExplorerLink
+                type="account"
+                value={r.walletAddress}
+                className="text-gray-500 dark:text-gray-400"
+              >
                 {r.walletAddress}
               </ExplorerLink>
             </p>
@@ -138,8 +177,16 @@ export default function App() {
             </div>
 
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-indigo-600">{r.price} USDC</span>
+              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                {r.price} USDC
+              </span>
               <div className="flex gap-1">
+                <button
+                  onClick={() => handleCopyUrl(r.accessUrl)}
+                  className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Copy URL
+                </button>
                 {API_KEY && needsRegistration(r) && (
                   <button
                     onClick={() => setActiveModal({ kind: "register", resource: r })}
@@ -152,13 +199,13 @@ export default function App() {
                   <>
                     <button
                       onClick={() => setActiveModal({ kind: "editPrice", resource: r })}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                      className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                     >
                       Edit price
                     </button>
                     <button
                       onClick={() => setActiveModal({ kind: "transferOwnership", resource: r })}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                      className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                     >
                       Transfer
                     </button>
@@ -199,6 +246,8 @@ export default function App() {
           onConfirmed={(txHash) => handleRegistrationConfirmed(activeModal.resource.id, txHash)}
         />
       )}
+
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }
