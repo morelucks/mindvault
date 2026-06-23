@@ -64,6 +64,7 @@ Available tools:
 | `mindvault_setup_wallet` | Create a Stellar wallet using the sponsored account protocol | `"Create a wallet for me"` |
 | `mindvault_wallet_info` | Check wallet address and USDC balance | `"What's my wallet balance?"` |
 | `mindvault_browse` | List available resources in the vault | `"Show me what resources are available"` |
+| `mindvault_search` | Search resources by keyword (title or description) | `"Search for weather datasets"` |
 | `mindvault_preview` | Get details and price for a resource | `"Preview resource swcn98besxpp6t1u8e77fqz3"` |
 | `mindvault_register` | Register as a publisher using the agent's wallet | `"Register me as Alice, alice@example.com"` |
 | `mindvault_publish` | Publish a resource and pay for verification via x402 | `"Publish 'My Dataset' for 5 USDC at https://example.com/data"` |
@@ -83,6 +84,16 @@ claude mcp add mindvault node /path/to/mindvault/mcp/dist/index.js
 # Codex
 codex mcp add mindvault -- node /path/to/mindvault/mcp/dist/index.js
 ```
+
+All env vars are optional — the defaults point to the hosted testnet backend:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MINDVAULT_URL` | `https://mindvault-hyr3.onrender.com` | MindVault API base URL |
+| `SPONSORED_ACCOUNT_URL` | `https://stellar-sponsored-agent-account.onrender.com` | Sponsored wallet creation service |
+| `VAULT_REGISTRY_CONTRACT_ID` | testnet contract ID | On-chain vault-registry contract |
+| `HORIZON_URL` | `https://horizon-testnet.stellar.org` | Stellar Horizon endpoint (for USDC balance checks) |
+| `SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint (for tx status and payments) |
 
 An agent can set up a wallet, register as a publisher, publish a resource (paying for verification), and then another agent can discover and buy that resource. The full agent-to-agent economy runs through x402.
 
