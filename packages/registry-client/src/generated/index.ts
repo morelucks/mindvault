@@ -30,29 +30,31 @@ if (typeof window !== "undefined") {
   window.Buffer = window.Buffer || Buffer;
 }
 
-
 export const networks = {
   testnet: {
     networkPassphrase: "Test SDF Network ; September 2015",
     contractId: "CDQKUIADLO5S5WEHEUTTXX2M45WAHVRU2PBEBD6ZGDKMOP5A72FJ3OD4",
-  }
-} as const
-
+  },
+} as const;
 
 export interface Resource {
   creator: string;
   id: string;
+  listed: boolean;
   metadata: string;
   price: i128;
 }
 
-export type DataKey = {tag: "Resource", values: readonly [string]} | {tag: "Count", values: void};
+export type DataKey =
+  | { tag: "Resource"; values: readonly [string] }
+  | { tag: "Count"; values: void }
+  | { tag: "Index"; values: readonly [u32] };
 
 export const Errors = {
-  1: {message:"AlreadyRegistered"},
-  2: {message:"NotFound"},
-  3: {message:"InvalidPrice"}
-}
+  1: { message: "AlreadyRegistered" },
+  2: { message: "NotFound" },
+  3: { message: "InvalidPrice" },
+};
 
 export interface Client {
   /**
@@ -60,44 +62,75 @@ export interface Client {
    * Register a new resource. Errors if `id` already exists or `price <= 0`.
    * Requires the creator's authorization.
    */
-  register: ({creator, id, price, metadata}: {creator: string, id: string, price: i128, metadata: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+  register: (
+    {
+      creator,
+      id,
+      price,
+      metadata,
+    }: { creator: string; id: string; price: i128; metadata: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a set_price transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Update a resource's price. Only the creator may call this.
    */
-  set_price: ({id, new_price}: {id: string, new_price: i128}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+  set_price: (
+    { id, new_price }: { id: string; new_price: i128 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a update_metadata transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Update a resource's metadata pointer. Only the creator may call this.
    */
-  update_metadata: ({id, metadata}: {id: string, metadata: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+  update_metadata: (
+    { id, metadata }: { id: string; metadata: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a transfer_ownership transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Hand ownership to a new creator. Only the current creator may call this.
    */
-  transfer_ownership: ({id, new_creator}: {id: string, new_creator: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+  transfer_ownership: (
+    { id, new_creator }: { id: string; new_creator: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a list transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation.
+   * Paginated resource list in insertion order. `limit` is capped at 20.
+   */
+  list: (
+    { start, limit }: { start: u32; limit: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<Resource>>>;
 
   /**
    * Construct and simulate a get transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Fetch a resource. Errors with `NotFound` if it does not exist.
    */
-  get: ({id}: {id: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Resource>>>
+  get: (
+    { id }: { id: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<Resource>>>;
 
   /**
    * Construct and simulate a exists transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Whether a resource with `id` is registered.
    */
-  exists: ({id}: {id: string}, options?: MethodOptions) => Promise<AssembledTransaction<boolean>>
+  exists: (
+    { id }: { id: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<boolean>>;
 
   /**
    * Construct and simulate a count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Total number of resources ever registered.
    */
-  count: (options?: MethodOptions) => Promise<AssembledTransaction<u32>>
-
+  count: (options?: MethodOptions) => Promise<AssembledTransaction<u32>>;
 }
 export class Client extends ContractClient {
   static async deploy<T = Client>(
@@ -110,13 +143,14 @@ export class Client extends ContractClient {
         salt?: Buffer | Uint8Array;
         /** The format used to decode `wasmHash`, if it's provided as a string. */
         format?: "hex" | "base64";
-      }
+      },
   ): Promise<AssembledTransaction<T>> {
-    return ContractClient.deploy(null, options)
+    return ContractClient.deploy(null, options);
   }
   constructor(public readonly options: ContractClientOptions) {
     super(
-      new ContractSpec([ "AAAAAQAAAAAAAAAAAAAACFJlc291cmNlAAAABAAAAAAAAAAHY3JlYXRvcgAAAAATAAAAAAAAAAJpZAAAAAAAEAAAAAAAAAAIbWV0YWRhdGEAAAAQAAAAAAAAAAVwcmljZQAAAAAAAAs=",
+      new ContractSpec([
+        "AAAAAQAAAAAAAAAAAAAACFJlc291cmNlAAAABAAAAAAAAAAHY3JlYXRvcgAAAAATAAAAAAAAAAJpZAAAAAAAEAAAAAAAAAAIbWV0YWRhdGEAAAAQAAAAAAAAAAVwcmljZQAAAAAAAAs=",
         "AAAAAgAAAAAAAAAAAAAAB0RhdGFLZXkAAAAAAgAAAAEAAAAAAAAACFJlc291cmNlAAAAAQAAABAAAAAAAAAAAAAAAAVDb3VudAAAAA==",
         "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAAwAAAAAAAAARQWxyZWFkeVJlZ2lzdGVyZWQAAAAAAAABAAAAAAAAAAhOb3RGb3VuZAAAAAIAAAAAAAAADEludmFsaWRQcmljZQAAAAM=",
         "AAAAAAAAAG1SZWdpc3RlciBhIG5ldyByZXNvdXJjZS4gRXJyb3JzIGlmIGBpZGAgYWxyZWFkeSBleGlzdHMgb3IgYHByaWNlIDw9IDBgLgpSZXF1aXJlcyB0aGUgY3JlYXRvcidzIGF1dGhvcml6YXRpb24uAAAAAAAACHJlZ2lzdGVyAAAABAAAAAAAAAAHY3JlYXRvcgAAAAATAAAAAAAAAAJpZAAAAAAAEAAAAAAAAAAFcHJpY2UAAAAAAAALAAAAAAAAAAhtZXRhZGF0YQAAABAAAAABAAAD6QAAA+0AAAAAAAAAAw==",
@@ -125,17 +159,19 @@ export class Client extends ContractClient {
         "AAAAAAAAAEhIYW5kIG93bmVyc2hpcCB0byBhIG5ldyBjcmVhdG9yLiBPbmx5IHRoZSBjdXJyZW50IGNyZWF0b3IgbWF5IGNhbGwgdGhpcy4AAAASdHJhbnNmZXJfb3duZXJzaGlwAAAAAAACAAAAAAAAAAJpZAAAAAAAEAAAAAAAAAALbmV3X2NyZWF0b3IAAAAAEwAAAAEAAAPpAAAD7QAAAAAAAAAD",
         "AAAAAAAAAD5GZXRjaCBhIHJlc291cmNlLiBFcnJvcnMgd2l0aCBgTm90Rm91bmRgIGlmIGl0IGRvZXMgbm90IGV4aXN0LgAAAAAAA2dldAAAAAABAAAAAAAAAAJpZAAAAAAAEAAAAAEAAAPpAAAH0AAAAAhSZXNvdXJjZQAAAAM=",
         "AAAAAAAAACtXaGV0aGVyIGEgcmVzb3VyY2Ugd2l0aCBgaWRgIGlzIHJlZ2lzdGVyZWQuAAAAAAZleGlzdHMAAAAAAAEAAAAAAAAAAmlkAAAAAAAQAAAAAQAAAAE=",
-        "AAAAAAAAACpUb3RhbCBudW1iZXIgb2YgcmVzb3VyY2VzIGV2ZXIgcmVnaXN0ZXJlZC4AAAAAAAVjb3VudAAAAAAAAAAAAAABAAAABA==" ]),
-      options
-    )
+        "AAAAAAAAACpUb3RhbCBudW1iZXIgb2YgcmVzb3VyY2VzIGV2ZXIgcmVnaXN0ZXJlZC4AAAAAAAVjb3VudAAAAAAAAAAAAAABAAAABA==",
+      ]),
+      options,
+    );
   }
   public readonly fromJSON = {
     register: this.txFromJSON<Result<void>>,
-        set_price: this.txFromJSON<Result<void>>,
-        update_metadata: this.txFromJSON<Result<void>>,
-        transfer_ownership: this.txFromJSON<Result<void>>,
-        get: this.txFromJSON<Result<Resource>>,
-        exists: this.txFromJSON<boolean>,
-        count: this.txFromJSON<u32>
-  }
+    set_price: this.txFromJSON<Result<void>>,
+    update_metadata: this.txFromJSON<Result<void>>,
+    transfer_ownership: this.txFromJSON<Result<void>>,
+    list: this.txFromJSON<Array<Resource>>,
+    get: this.txFromJSON<Result<Resource>>,
+    exists: this.txFromJSON<boolean>,
+    count: this.txFromJSON<u32>,
+  };
 }

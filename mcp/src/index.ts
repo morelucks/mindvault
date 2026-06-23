@@ -4,12 +4,11 @@
  * Exposes vault tools to AI agents via the Model Context Protocol.
  */
 
+import { networks as registryNetworks, type Resource } from "@mindvault/registry-client";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createEd25519Signer } from "@x402/stellar";
 import { ExactStellarScheme } from "@x402/stellar/exact/client";
 import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
@@ -17,11 +16,13 @@ import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.MINDVAULT_URL ?? "https://mindvault-hyr3.onrender.com";
+const REGISTRY_CONTRACT_ID =
+  process.env.VAULT_REGISTRY_CONTRACT_ID ?? registryNetworks.testnet.contractId;
+const REGISTRY_NETWORK_PASSPHRASE = registryNetworks.testnet.networkPassphrase;
 const SPONSORED_ACCOUNT_URL =
-  process.env.SPONSORED_ACCOUNT_URL ??
-  "https://stellar-sponsored-agent-account.onrender.com";
-const HORIZON_URL =
-  process.env.HORIZON_URL ?? "https://horizon-testnet.stellar.org";
+  process.env.SPONSORED_ACCOUNT_URL ?? "https://stellar-sponsored-agent-account.onrender.com";
+const HORIZON_URL = process.env.HORIZON_URL ?? "https://horizon-testnet.stellar.org";
+const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
 const NETWORK = "stellar:testnet";
 
 // ── In-memory agent state ─────────────────────────────────────────────────────
@@ -36,7 +37,10 @@ let agentApiKey: string | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function jsonFetch(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
+async function jsonFetch(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -66,9 +70,71 @@ async function getUsdcBalance(publicKey: string): Promise<string> {
   if (!res.ok) return "0";
   const data: any = await res.json();
   const b = (data.balances ?? []).find(
-    (b: any) => b.asset_type === "credit_alphanum4" && b.asset_code === "USDC"
+    (b: any) => b.asset_type === "credit_alphanum4" && b.asset_code === "USDC",
   );
   return b?.balance ?? "0";
+}
+
+function formatResource(r: any): string {
+  return `[${r.id}] ${r.title} — $${r.price} USDC\n  ${r.description ?? ""}\n  ${r.accessUrl}`;
+}
+
+/**
+ * Compares the agent wallet's USDC balance against an amount it is about to
+ * spend. Returns an actionable insufficient-funds message (balance, amount
+ * needed, and the shortfall) when the wallet can't cover the cost, or null
+ * when the balance is sufficient.
+ */
+async function insufficientFundsMessage(
+  wallet: AgentWallet,
+  amountNeeded: string | number,
+  action: string,
+): Promise<string | null> {
+  const need = typeof amountNeeded === "number" ? amountNeeded : parseFloat(amountNeeded);
+  if (!Number.isFinite(need)) return null;
+  const balance = await getUsdcBalance(wallet.publicKey);
+  const have = parseFloat(balance);
+  if (!Number.isFinite(have) || have >= need) return null;
+  const shortfall = need - have;
+  return [
+    `Insufficient USDC to ${action}.`,
+    `Amount needed: ${need} USDC`,
+    `Current balance: ${have} USDC`,
+    `Shortfall: ${shortfall.toFixed(7).replace(/\.?0+$/, "")} USDC`,
+    `Fund ${wallet.publicKey} with the shortfall and retry.`,
+  ].join("\n");
+}
+
+async function txStatus(txHash: string): Promise<string> {
+  const res = await fetch(SOROBAN_RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getTransaction",
+      params: { hash: txHash },
+    }),
+  });
+  if (!res.ok) throw new Error(`Soroban RPC error: ${res.status}`);
+  const data: any = await res.json();
+  if (data.error) throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
+  const tx = data.result;
+  return JSON.stringify(
+    {
+      status: tx.status,
+      hash: txHash,
+      ledger: tx.ledger,
+      ledgerCloseTime: tx.createdAt ? new Date(tx.createdAt * 1000).toISOString() : null,
+      applicationOrder: tx.applicationOrder,
+      feeBump: tx.feeBump,
+      envelopeXdr: tx.envelopeXdr,
+      resultXdr: tx.resultXdr,
+      resultMetaXdr: tx.resultMetaXdr,
+    },
+    null,
+    2,
+  );
 }
 
 // ── Tool handlers ─────────────────────────────────────────────────────────────
@@ -91,9 +157,20 @@ async function browse(): Promise<string> {
   if (!res.ok) throw new Error(`Browse failed: ${JSON.stringify(res.data)}`);
   const items: any[] = res.data;
   if (items.length === 0) return "No resources listed yet.";
-  return items
-    .map((r) => `[${r.id}] ${r.title} — $${r.price} USDC\n  ${r.description ?? ""}\n  ${r.accessUrl}`)
-    .join("\n\n");
+  return items.map(formatResource).join("\n\n");
+}
+
+async function search(query: string): Promise<string> {
+  const q = (query ?? "").trim().toLowerCase();
+  if (!q) return "Provide a non-empty search query.";
+  const res = await jsonFetch(`${BASE_URL}/resources`);
+  if (!res.ok) throw new Error(`Search failed: ${JSON.stringify(res.data)}`);
+  const items: any[] = res.data;
+  const matches = items.filter((r) =>
+    `${r.title ?? ""} ${r.description ?? ""}`.toLowerCase().includes(q),
+  );
+  if (matches.length === 0) return `No resources match "${query}".`;
+  return matches.map(formatResource).join("\n\n");
 }
 
 async function preview(resourceId: string): Promise<string> {
@@ -101,8 +178,17 @@ async function preview(resourceId: string): Promise<string> {
   if (!res.ok) throw new Error(`Preview failed: ${JSON.stringify(res.data)}`);
   const r = res.data;
   return JSON.stringify(
-    { id: r.id, title: r.title, description: r.description, price: `$${r.price} USDC`, type: r.resourceType, verificationStatus: r.verificationStatus, accessUrl: r.accessUrl },
-    null, 2
+    {
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      price: `$${r.price} USDC`,
+      type: r.resourceType,
+      verificationStatus: r.verificationStatus,
+      accessUrl: r.accessUrl,
+    },
+    null,
+    2,
   );
 }
 
@@ -140,9 +226,22 @@ async function publish(args: {
   if (!createRes.ok) throw new Error(`Publish failed: ${JSON.stringify(createRes.data)}`);
   const resource = createRes.data;
 
-  // Step 2 + 3: Agent wallet signs the x402 payment for verification.
-  // wrapFetchWithPayment intercepts the 402, signs a Soroban USDC auth entry
-  // using the agent's Ed25519 key, and retries with the payment header.
+  // Step 2: Agent wallet signs the x402 payment for verification. Check funds
+  // first so a shortfall returns an actionable message rather than a created-
+  // but-unverifiable resource with an opaque payment error.
+  const statusRes = await jsonFetch(`${BASE_URL}/agent/status`);
+  const verificationPrice = statusRes.ok ? statusRes.data?.agent?.pricePerVerification : null;
+  if (verificationPrice != null) {
+    const shortMsg = await insufficientFundsMessage(
+      wallet,
+      verificationPrice,
+      "pay the content verification fee",
+    );
+    if (shortMsg) {
+      return `${shortMsg}\n(Resource created with id ${resource.id}; verify it later once funded.)`;
+    }
+  }
+
   const paidFetch = makePaidFetch(wallet);
 
   const verifyRes = await paidFetch(`${BASE_URL}/verify-content`, {
@@ -166,12 +265,40 @@ async function publish(args: {
   const isOriginal: boolean = verifyData?.isOriginal ?? false;
   const flags: string[] = verifyData?.flags ?? [];
 
+  if (!isOriginal) {
+    return [
+      `Resource created but rejected by verification.`,
+      `ID: ${resource.id}`,
+      `Verification: rejected ✗`,
+      flags.length ? `Flags: ${flags.join("; ")}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  // Step 3: Trigger on-chain registration (best-effort — failure doesn't block listing)
+  const registerRes = await jsonFetch(`${BASE_URL}/resources/${resource.id}/register`, {
+    method: "POST",
+    headers: { "x-api-key": agentApiKey },
+  });
+
+  const onchainStatus: string = registerRes.ok
+    ? (registerRes.data.onchainStatus ?? "registered")
+    : "failed";
+  const onchainTxHash: string | null = registerRes.ok
+    ? (registerRes.data.onchainTxHash ?? null)
+    : null;
+
   return [
     `Resource published.`,
     `ID: ${resource.id}`,
     `Access URL: ${resource.accessUrl}`,
-    `Verification: ${isOriginal ? "approved ✓" : "rejected ✗"}`,
-    flags.length ? `Flags: ${flags.join("; ")}` : null,
+    `Verification: approved ✓`,
+    `On-chain status: ${onchainStatus}`,
+    onchainTxHash ? `On-chain tx: ${onchainTxHash}` : null,
+    !registerRes.ok
+      ? `(Registration failed — resource is still listed and purchasable. Retry with mindvault_register_onchain.)`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -179,6 +306,19 @@ async function publish(args: {
 
 async function buy(resourceId: string): Promise<string> {
   const wallet = requireWallet();
+
+  // Check the wallet can cover the price before attempting payment so a
+  // shortfall returns an actionable message instead of an opaque payment error.
+  const meta = await jsonFetch(`${BASE_URL}/resources/${resourceId}/meta`);
+  if (meta.ok && meta.data?.price != null) {
+    const shortMsg = await insufficientFundsMessage(
+      wallet,
+      meta.data.price,
+      `buy "${meta.data.title ?? resourceId}"`,
+    );
+    if (shortMsg) return shortMsg;
+  }
+
   const paidFetch = makePaidFetch(wallet);
   const res = await paidFetch(`${BASE_URL}/resources/${resourceId}`);
   if (!res.ok) {
@@ -194,23 +334,121 @@ async function agentStatus(): Promise<string> {
   return JSON.stringify(res.data, null, 2);
 }
 
+function registryInfo(): string {
+  const info: {
+    contractId: string;
+    networkPassphrase: string;
+    rpcUrl: string;
+    resourceFields: (keyof Resource)[];
+  } = {
+    contractId: REGISTRY_CONTRACT_ID,
+    networkPassphrase: REGISTRY_NETWORK_PASSPHRASE,
+    rpcUrl: SOROBAN_RPC_URL,
+    resourceFields: ["id", "creator", "price", "metadata", "listed"],
+  };
+  return JSON.stringify(info, null, 2);
+}
+
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
-const server = new Server(
-  { name: "mindvault", version: "1.0.0" },
-  { capabilities: { tools: {} } }
-);
+const server = new Server({ name: "mindvault", version: "1.0.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
-    { name: "mindvault_setup_wallet", description: "Create a Stellar wallet using the sponsored account protocol.", inputSchema: { type: "object", properties: {}, required: [] } },
-    { name: "mindvault_wallet_info", description: "Check the agent wallet address and USDC balance.", inputSchema: { type: "object", properties: {}, required: [] } },
-    { name: "mindvault_browse", description: "List all available resources in the MindVault catalog.", inputSchema: { type: "object", properties: {}, required: [] } },
-    { name: "mindvault_preview", description: "Get details and price for a specific resource.", inputSchema: { type: "object", properties: { resourceId: { type: "string" } }, required: ["resourceId"] } },
-    { name: "mindvault_register", description: "Register as a publisher using the agent wallet.", inputSchema: { type: "object", properties: { name: { type: "string" }, email: { type: "string" }, walletAddress: { type: "string" } }, required: ["name", "email"] } },
-    { name: "mindvault_publish", description: "Publish a link resource. Agent wallet signs the x402 verification payment on-chain.", inputSchema: { type: "object", properties: { title: { type: "string" }, description: { type: "string" }, price: { type: "string" }, externalUrl: { type: "string" } }, required: ["title", "price", "externalUrl"] } },
-    { name: "mindvault_buy", description: "Pay USDC via x402 and access a resource.", inputSchema: { type: "object", properties: { resourceId: { type: "string" } }, required: ["resourceId"] } },
-    { name: "mindvault_agent_status", description: "Check the verification agent's earnings and activity.", inputSchema: { type: "object", properties: {}, required: [] } },
+    {
+      name: "mindvault_setup_wallet",
+      description: "Create a Stellar wallet using the sponsored account protocol.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "mindvault_wallet_info",
+      description: "Check the agent wallet address and USDC balance.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "mindvault_browse",
+      description: "List all available resources in the MindVault catalog.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "mindvault_search",
+      description:
+        "Search the MindVault catalog by keyword and return matching resources (title or description match). Use this to find resources without browsing the full list.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Keyword(s) to match against resources." },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "mindvault_preview",
+      description: "Get details and price for a specific resource.",
+      inputSchema: {
+        type: "object",
+        properties: { resourceId: { type: "string" } },
+        required: ["resourceId"],
+      },
+    },
+    {
+      name: "mindvault_register",
+      description: "Register as a publisher using the agent wallet.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          email: { type: "string" },
+          walletAddress: { type: "string" },
+        },
+        required: ["name", "email"],
+      },
+    },
+    {
+      name: "mindvault_publish",
+      description:
+        "Publish a link resource. Agent wallet signs the x402 verification payment on-chain.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          price: { type: "string" },
+          externalUrl: { type: "string" },
+        },
+        required: ["title", "price", "externalUrl"],
+      },
+    },
+    {
+      name: "mindvault_buy",
+      description: "Pay USDC via x402 and access a resource.",
+      inputSchema: {
+        type: "object",
+        properties: { resourceId: { type: "string" } },
+        required: ["resourceId"],
+      },
+    },
+    {
+      name: "mindvault_agent_status",
+      description: "Check the verification agent's earnings and activity.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "mindvault_registry_info",
+      description:
+        "Return the on-chain vault-registry contract ID and network so you can query ownership, price, and listing state directly from Stellar without trusting the MindVault API.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "mindvault_tx_status",
+      description:
+        "Look up the status of a Stellar transaction by hash via Soroban RPC. Returns SUCCESS, FAILED, or NOT_FOUND along with ledger details and XDR.",
+      inputSchema: {
+        type: "object",
+        properties: { txHash: { type: "string" } },
+        required: ["txHash"],
+      },
+    },
   ],
 }));
 
@@ -219,15 +457,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     let result: string;
     switch (name) {
-      case "mindvault_setup_wallet": result = await setupWallet(); break;
-      case "mindvault_wallet_info":  result = await walletInfo(); break;
-      case "mindvault_browse":       result = await browse(); break;
-      case "mindvault_preview":      result = await preview(args.resourceId as string); break;
-      case "mindvault_register":     result = await register(args.name as string, args.email as string, args.walletAddress as string | undefined); break;
-      case "mindvault_publish":      result = await publish({ title: args.title as string, description: args.description as string | undefined, price: args.price as string, externalUrl: args.externalUrl as string }); break;
-      case "mindvault_buy":          result = await buy(args.resourceId as string); break;
-      case "mindvault_agent_status": result = await agentStatus(); break;
-      default: throw new Error(`Unknown tool: ${name}`);
+      case "mindvault_setup_wallet":
+        result = await setupWallet();
+        break;
+      case "mindvault_wallet_info":
+        result = await walletInfo();
+        break;
+      case "mindvault_browse":
+        result = await browse();
+        break;
+      case "mindvault_search":
+        result = await search(args.query as string);
+        break;
+      case "mindvault_preview":
+        result = await preview(args.resourceId as string);
+        break;
+      case "mindvault_register":
+        result = await register(
+          args.name as string,
+          args.email as string,
+          args.walletAddress as string | undefined,
+        );
+        break;
+      case "mindvault_publish":
+        result = await publish({
+          title: args.title as string,
+          description: args.description as string | undefined,
+          price: args.price as string,
+          externalUrl: args.externalUrl as string,
+        });
+        break;
+      case "mindvault_buy":
+        result = await buy(args.resourceId as string);
+        break;
+      case "mindvault_agent_status":
+        result = await agentStatus();
+        break;
+      case "mindvault_registry_info":
+        result = registryInfo();
+        break;
+      case "mindvault_tx_status":
+        result = await txStatus(args.txHash as string);
+        break;
+      default:
+        throw new Error(`Unknown tool: ${name}`);
     }
     return { content: [{ type: "text", text: result }] };
   } catch (err: any) {

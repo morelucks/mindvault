@@ -33,7 +33,7 @@ async function main() {
   // Check current balances
   const account = await server.loadAccount(publicKey);
   const usdcBalance = account.balances.find(
-    (b: any) => b.asset_code === "USDC" && b.asset_issuer === TESTNET_USDC_ISSUER
+    (b: any) => b.asset_code === "USDC" && b.asset_issuer === TESTNET_USDC_ISSUER,
   );
 
   if (usdcBalance) {
@@ -64,9 +64,7 @@ async function main() {
   // Let's try the common testnet USDC distribution endpoint:
 
   try {
-    const resp = await fetch(
-      `https://horizon-testnet.stellar.org/friendbot?addr=${publicKey}`
-    );
+    const resp = await fetch(`https://horizon-testnet.stellar.org/friendbot?addr=${publicKey}`);
     if (resp.ok) {
       console.log("Friendbot: topped up XLM.");
     }
