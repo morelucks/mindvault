@@ -86,6 +86,47 @@ importers:
         specifier: ^6.0.2
         version: 6.0.3
 
+  mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.29.0(zod@4.4.3)
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.1.0
+      '@x402/fetch':
+        specifier: ^2.9.0
+        version: 2.13.0
+      '@x402/stellar':
+        specifier: ^2.9.0
+        version: 2.12.0
+      node-fetch:
+        specifier: ^3.3.2
+        version: 3.3.2
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.3
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+
+  packages/registry-client:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.1.0
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
+    devDependencies:
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+
   server:
     dependencies:
       '@mindvault/registry-client':
@@ -5114,6 +5155,7 @@ snapshots:
       source-map: 0.6.1
 
   eventsource-parser@3.1.0: {}
+
   
   eventsource@2.0.2: {}
 
@@ -5767,6 +5809,8 @@ snapshots:
       sax: 1.6.0
 
   negotiator@1.0.0: {}
+
+  node-domexception@1.0.0: {}
 
   netmask@2.1.1: {}
 
