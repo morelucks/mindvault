@@ -13,11 +13,7 @@ export function useEditPrice(resourceId: string, apiKey: string) {
     try {
       // Step 1 — fetch unsigned XDR from the server
       setStatus("preparing");
-      const { unsignedXdr, networkPassphrase } = await prepareSetPrice(
-        resourceId,
-        price,
-        apiKey
-      );
+      const { unsignedXdr, networkPassphrase } = await prepareSetPrice(resourceId, price, apiKey);
 
       // Step 2 — ask Freighter (or any SEP-43 wallet) to sign
       setStatus("signing");
@@ -28,7 +24,7 @@ export function useEditPrice(resourceId: string, apiKey: string) {
 
       if ("error" in result && result.error) {
         throw new Error(
-          typeof result.error === "string" ? result.error : "Wallet rejected signing"
+          typeof result.error === "string" ? result.error : "Wallet rejected signing",
         );
       }
 

@@ -16,7 +16,7 @@ export function useTransferOwnership(resourceId: string, apiKey: string) {
       const { unsignedXdr, networkPassphrase } = await prepareTransferOwnership(
         resourceId,
         newCreator,
-        apiKey
+        apiKey,
       );
 
       // Step 2 — ask Freighter (or any SEP-43 wallet) to sign
@@ -28,7 +28,7 @@ export function useTransferOwnership(resourceId: string, apiKey: string) {
 
       if ("error" in result && result.error) {
         throw new Error(
-          typeof result.error === "string" ? result.error : "Wallet rejected signing"
+          typeof result.error === "string" ? result.error : "Wallet rejected signing",
         );
       }
 
@@ -38,12 +38,7 @@ export function useTransferOwnership(resourceId: string, apiKey: string) {
 
       // Step 3 — submit signed XDR and sync DB owner
       setStatus("submitting");
-      const updated = await submitTransferOwnership(
-        resourceId,
-        signedXdr,
-        newCreator,
-        apiKey
-      );
+      const updated = await submitTransferOwnership(resourceId, signedXdr, newCreator, apiKey);
       setNewOwner(updated.newCreator);
       setStatus("confirmed");
     } catch (err) {
