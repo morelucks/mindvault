@@ -100,7 +100,7 @@ curl -s -X POST $BASE/resources \
     "title": "My Research Dataset",
     "description": "Curated dataset of 10k annotated examples.",
     "price": "0.50",
-    "externalUrl": "https://example.com/dataset.zip"
+    "externalUrl": "https://your-host.example/dataset.zip"
   }' | jq .
 ```
 
