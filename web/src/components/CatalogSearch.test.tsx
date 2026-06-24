@@ -8,7 +8,13 @@ function renderComponent(filters: CatalogFilters = {}) {
   const onChange = vi.fn();
   const onReset = vi.fn();
   render(
-    <CatalogSearch filters={filters} total={10} filtered={10} onChange={onChange} onReset={onReset} />,
+    <CatalogSearch
+      filters={filters}
+      total={10}
+      filtered={10}
+      onChange={onChange}
+      onReset={onReset}
+    />,
   );
   return { onChange, onReset };
 }

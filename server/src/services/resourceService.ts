@@ -114,12 +114,26 @@ async function queryCatalog() {
     .where(eq(resources.listed, true));
 }
 
-export async function listCatalog(): Promise<Awaited<ReturnType<typeof queryCatalog>>> {
-  const cached = readCache.get(CATALOG_KEY);
-  if (cached !== undefined) return cached as Awaited<ReturnType<typeof queryCatalog>>;
+export async function listCatalog(
+  searchTerm?: string,
+): Promise<Awaited<ReturnType<typeof queryCatalog>>> {
+  let rows: Awaited<ReturnType<typeof queryCatalog>>;
 
-  const rows = await queryCatalog();
-  readCache.set(CATALOG_KEY, rows);
+  const cached = readCache.get(CATALOG_KEY);
+  if (cached !== undefined) {
+    rows = cached as Awaited<ReturnType<typeof queryCatalog>>;
+  } else {
+    rows = await queryCatalog();
+    readCache.set(CATALOG_KEY, rows);
+  }
+
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    return rows.filter(
+      (r) => r.title?.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q),
+    );
+  }
+
   return rows;
 }
 

@@ -71,12 +71,9 @@ export default function App() {
   const {
     status: registryStatus,
     data: registryData,
-    error: registryError,
+    error: _registryError,
     retry: retryRegistry,
-  } = useAsync<{ resourceCount: number }>(
-    (_signal) => fetchRegistryStatus(),
-    [],
-  );
+  } = useAsync<{ resourceCount: number }>((_signal) => fetchRegistryStatus(), []);
 
   const filteredResources: Resource[] = useMemo(() => {
     if (!rawResources) return [];
@@ -190,8 +187,8 @@ export default function App() {
           {API_KEY && filteredResources.some(needsRegistration) && (
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                {filteredResources.filter(needsRegistration).length} resource(s) verified but not yet
-                registered on-chain.
+                {filteredResources.filter(needsRegistration).length} resource(s) verified but not
+                yet registered on-chain.
               </p>
             </div>
           )}
@@ -221,7 +218,12 @@ export default function App() {
           {/* ── Resource grid ────────────────────────────────────────────────── */}
           {resourcesStatus === "success" && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredResources.length === 0 && (filters.search || filters.verificationStatus !== "all" || filters.resourceType !== "all" || filters.minPrice || filters.maxPrice) ? (
+              {filteredResources.length === 0 &&
+              (filters.search ||
+                filters.verificationStatus !== "all" ||
+                filters.resourceType !== "all" ||
+                filters.minPrice ||
+                filters.maxPrice) ? (
                 <div className="col-span-full py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   No resources match your filters.{" "}
                   <button

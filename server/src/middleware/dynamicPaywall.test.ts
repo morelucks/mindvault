@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockPaymentMiddleware = vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next());
+const mockPaymentMiddleware = vi.fn(
+  () => (_req: unknown, _res: unknown, next: () => void) => next(),
+);
 const mockGetOnChainPrice = vi.fn();
 const mockNormalizeUsdcPrice = vi.fn((value: string) => value);
 

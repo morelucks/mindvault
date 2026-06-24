@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App.js";
 import { fetchCatalog, fetchRegistryStatus } from "./api/resources.js";
+import type { CatalogFilters } from "./api/resources.js";
 
 vi.mock("./api/resources.js", () => ({
   fetchCatalog: vi.fn(),
@@ -25,6 +26,8 @@ function resource(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+const mockResource = resource();
+
 describe("App catalog empty states", () => {
   beforeEach(() => {
     vi.mocked(fetchRegistryStatus).mockResolvedValue({ resourceCount: 0 });
@@ -36,15 +39,16 @@ describe("App catalog empty states", () => {
     render(<App />);
 
     expect(await screen.findByText("The catalog is empty")).toBeInTheDocument();
-    expect(
-      screen.getByText(/No resources have been published yet/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No resources have been published yet/)).toBeInTheDocument();
     const cta = screen.getByRole("link", { name: /Publish a resource/ });
     expect(cta).toHaveAttribute("href", "https://docs.mindvault.app/publishing");
   });
 
   it("shows the no-matches state when filters exclude every resource", async () => {
-    vi.mocked(fetchCatalog).mockResolvedValue([resource()]);
+    vi.mocked(fetchCatalog).mockImplementation(async (filters?: CatalogFilters) => {
+      if (filters?.search) return [];
+      return [mockResource];
+    });
 
     render(<App />);
 
@@ -56,7 +60,10 @@ describe("App catalog empty states", () => {
   });
 
   it("clearing filters from the no-matches state restores the resource list", async () => {
-    vi.mocked(fetchCatalog).mockResolvedValue([resource()]);
+    vi.mocked(fetchCatalog).mockImplementation(async (filters?: CatalogFilters) => {
+      if (filters?.search) return [];
+      return [mockResource];
+    });
 
     render(<App />);
 
@@ -64,7 +71,9 @@ describe("App catalog empty states", () => {
     await userEvent.type(search, "nonexistent-title");
     const emptyState = await screen.findByText(/No resources match your filters\./);
 
-    await userEvent.click(within(emptyState.parentElement!).getByRole("button", { name: "Clear filters" }));
+    await userEvent.click(
+      within(emptyState.parentElement!).getByRole("button", { name: "Clear filters" }),
+    );
 
     await waitFor(() => {
       expect(screen.queryByText(/No resources match your filters\./)).not.toBeInTheDocument();
