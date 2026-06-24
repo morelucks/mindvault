@@ -9,6 +9,17 @@ import { network, sharedX402ResourceServer } from "../lib/x402.js";
 import { getResource } from "../services/registryClient.js";
 import { getOnChainPrice, normalizeUsdcPrice, OnChainLookupError } from "../lib/stellarRegistry.js";
 
+async function getOnChainPrice(resourceId: string): Promise<{ price: string; creator: string }> {
+  const onChain = await getResource(resourceId);
+  if (!onChain) throw new Error(`Resource ${resourceId} not found on-chain`);
+  const price = (Number(onChain.price) / 10_000_000).toFixed(7);
+  return { price, creator: onChain.creator };
+}
+
+function normalizeUsdcPrice(price: string): string {
+  return parseFloat(price).toFixed(7);
+}
+
 // Cache middleware instances by resource ID to avoid re-creating on every request
 const middlewareCache = new Map<
   string,
@@ -46,7 +57,7 @@ export async function dynamicPaywall(req: Request, res: Response, next: NextFunc
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const cause =
-      err instanceof OnChainLookupError && err.cause instanceof Error
+      err instanceof Error && err.cause instanceof Error
         ? err.cause.message
         : undefined;
     getLogger().error(

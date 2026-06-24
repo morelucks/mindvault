@@ -33,6 +33,7 @@ import { getIdempotencyStore, idempotencyCacheKey } from "../lib/idempotency.js"
 import {
   NETWORK_PASSPHRASE,
   registryClient,
+  registryKeypair,
   setPrice,
   transferOwnership,
   buildRegisterTx,

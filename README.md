@@ -1,6 +1,6 @@
 # MindVault
 
-MindVault is a payment-protected vault for digital resources built on Stellar. Creators store their work and MindVault wraps it with an HTTP 402 paywall using the x402 protocol. Anyone with the resource URL — whether a human in a browser or an AI agent running autonomously — pays USDC on Stellar to access it.
+MindVault is a payment-protected vault for digital resources built on Stellar. Creators store their work and MindVault wraps it with an HTTP 402 paywall using the [x402 protocol](docs/GLOSSARY.md#x402). Anyone with the resource URL — whether a human in a browser or an AI agent running autonomously — pays USDC on Stellar to access it.
 
 ## The Problem
 
@@ -23,13 +23,13 @@ One URL. One payment. One delivery. No accounts. No middleman.
 
 MindVault is built entirely on Stellar's infrastructure. Every payment that flows through the platform is a real USDC transaction on the Stellar network.
 
-**x402 Protocol** — The HTTP 402 status code was reserved for "Payment Required" but never standardized. The x402 protocol gives it a purpose. When a client requests a paywalled resource, the server returns a 402 with a `PAYMENT-REQUIRED` header containing the price, destination wallet, network, and payment scheme. The client signs a Soroban authorization entry for a USDC transfer, attaches it to the retry request, and the x402 facilitator verifies and settles the transaction on-chain. We use the `@x402/express` middleware on the server and `@x402/stellar` for signing on the client.
+**x402 Protocol** — The HTTP 402 status code was reserved for "Payment Required" but never standardized. The x402 protocol gives it a purpose. When a client requests a paywalled resource, the server returns a 402 with a `PAYMENT-REQUIRED` header containing the price, destination wallet, network, and payment scheme. The client signs a [Soroban](docs/GLOSSARY.md#soroban) authorization entry for a USDC transfer, attaches it to the retry request, and the x402 facilitator verifies and settles the transaction on-chain. We use the `@x402/express` middleware on the server and `@x402/stellar` for signing on the client.
 
 **USDC on Soroban** — All payments use the Stellar testnet USDC token contract (`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`). This is a Stellar Asset Contract (SAC) that wraps the classic USDC issuer. Balances are interchangeable between classic and Soroban operations.
 
 **Wallet Connection** — The web app uses `@stellar/freighter-api` to connect [Freighter](https://www.freighter.app/) browser wallets. When a user pays for a resource, Freighter signs the Soroban transaction entry directly via the Freighter extension API.
 
-**Sponsored Agent Accounts** — The MCP server uses the [stellar-sponsored-agent-account](https://github.com/oceans404/stellar-sponsored-agent-account) service to create wallets for AI agents. The service sponsors the ~1.5 XLM reserve needed to create an account and establish a USDC trustline, so an agent can get a wallet with zero upfront cost.
+**[Sponsored Agent Accounts](docs/GLOSSARY.md#sponsored-accounts)** — The MCP server uses the [stellar-sponsored-agent-account](https://github.com/oceans404/stellar-sponsored-agent-account) service to create wallets for AI agents. The service sponsors the ~1.5 XLM reserve needed to create an account and establish a USDC trustline, so an agent can get a wallet with zero upfront cost.
 
 **Two Platform Wallets** — MindVault operates two separate Stellar wallets. The platform wallet (`GB6LGS25...`) receives verification fees. The agent wallet (`GDNNUI6N...`) pays for verification when publishing via the MCP server. Both are visible on Stellar Explorer with real USDC transactions flowing between them.
 
@@ -47,7 +47,7 @@ The verification agent has processed 7 verifications, approved 2, rejected 5, an
 
 **Creators** store their resources, set a price in USDC, and receive payments directly to their Stellar wallet every time someone accesses their work. No platform cut.
 
-**AI Agents** can browse the catalog, pay for resources, and even publish their own — all programmatically through the API or MCP server. No accounts, no OAuth. An HTTP request and a Stellar payment is all they need.
+**AI Agents** can browse the catalog, pay for resources, and even publish their own — all programmatically through the API or [MCP](docs/GLOSSARY.md#mcp) server. No accounts, no OAuth. An HTTP request and a Stellar payment is all they need.
 
 **Humans** connect a [Freighter](https://www.freighter.app/) browser wallet, browse the vault, and pay to access resources with one click.
 
@@ -150,6 +150,7 @@ Wallet helpers live in `server/scripts/generate-wallet.ts` (run via `make wallet
 
 ## Operations
 
+- **Reconciliation**: see [docs/reconciliation.md](docs/reconciliation.md) — detects and reports drift between the DB and the on-chain [vault registry](docs/GLOSSARY.md#vault-registry); run with `pnpm reconcile` from `server/`.
 - **Deployment runbook**: see [docs/deployment-runbook.md](docs/deployment-runbook.md) — step-by-step guide to deploy the full stack (contract + server + frontend + MCP) to a new Stellar network.
 - **Reconciliation**: see [docs/reconciliation.md](docs/reconciliation.md) — detects and reports drift between the DB and the on-chain vault registry; run with `pnpm reconcile` from `server/`.
 

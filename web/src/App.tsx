@@ -180,6 +180,36 @@ export default function App() {
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {resources.length === 0 && (
+          <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white px-8 py-16 text-center">
+            <p className="text-base font-semibold text-gray-800">No resources yet</p>
+            <p className="mt-2 max-w-sm text-sm text-gray-500">
+              {API_KEY
+                ? "Publish your first resource using the MCP server or API, then it will appear here."
+                : "The catalog is empty. Resources appear here once creators publish and verify them."}
+            </p>
+            {API_KEY && (
+              <a
+                href="https://github.com/Damidesign/mindvault#mcp-server"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                View publishing guide
+              </a>
+            )}
+          </div>
+        )}
+        {resources.map((r) => (
+          <div key={r.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="font-semibold text-gray-900">{r.title}</p>
+            {r.publisherName && (
+              <p className="mt-1 text-sm text-gray-500">by {r.publisherName}</p>
+            )}
+            <p className="mt-1 truncate text-xs text-gray-400" title={r.walletAddress}>
+              Owner: {r.walletAddress}
+            </p>
       {/* ── Analytics tab ───────────────────────────────────────────────────── */}
       {tab === "analytics" && API_KEY && <AnalyticsDashboard apiKey={API_KEY} />}
 
