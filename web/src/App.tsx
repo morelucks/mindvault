@@ -62,7 +62,10 @@ export default function App() {
     data: rawResources,
     error: resourcesError,
     retry: retryResources,
-  } = useAsync<Resource[]>((_signal) => (API_KEY ? fetchMyResources(API_KEY) : fetchCatalog()), []);
+  } = useAsync<Resource[]>(
+    (_signal) => (API_KEY ? fetchMyResources(API_KEY) : fetchCatalog(filters)),
+    [filters],
+  );
 
   // ── Registry status fetch ─────────────────────────────────────────────────
   const { data: registryData } = useAsync<{ resourceCount: number }>(
@@ -70,32 +73,10 @@ export default function App() {
     [],
   );
 
-  const resources: Resource[] = useMemo(() => {
+  const filteredResources: Resource[] = useMemo(() => {
     if (!rawResources) return [];
     return rawResources.map((r) => ({ ...r, ...(overrides[r.id] ?? {}) }));
   }, [rawResources, overrides]);
-
-  const filteredResources = useMemo(() => {
-    return resources.filter((r) => {
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        if (!r.title.toLowerCase().includes(q)) return false;
-      }
-      if (filters.verificationStatus && filters.verificationStatus !== "all") {
-        if (r.verificationStatus !== filters.verificationStatus) return false;
-      }
-      if (filters.resourceType && filters.resourceType !== "all") {
-        if (r.resourceType !== filters.resourceType) return false;
-      }
-      if (filters.minPrice) {
-        if (parseFloat(r.price) < parseFloat(filters.minPrice)) return false;
-      }
-      if (filters.maxPrice) {
-        if (parseFloat(r.price) > parseFloat(filters.maxPrice)) return false;
-      }
-      return true;
-    });
-  }, [resources, filters]);
 
   async function handleCopyUrl(url: string) {
     try {
@@ -176,10 +157,10 @@ export default function App() {
       {tab === "catalog" && (
         <>
           {/* ── Pending registration banner ──────────────────────────────────── */}
-          {API_KEY && resources.some(needsRegistration) && (
+          {API_KEY && filteredResources.some(needsRegistration) && (
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                {resources.filter(needsRegistration).length} resource(s) verified but not yet
+                {filteredResources.filter(needsRegistration).length} resource(s) verified but not yet
                 registered on-chain.
               </p>
             </div>
@@ -189,7 +170,7 @@ export default function App() {
           {!API_KEY && !isLoading && resourcesStatus === "success" && (
             <CatalogSearch
               filters={filters}
-              total={resources.length}
+              total={filteredResources.length}
               filtered={filteredResources.length}
               onChange={setFilters}
               onReset={() => setFilters(DEFAULT_FILTERS)}
@@ -210,7 +191,7 @@ export default function App() {
           {/* ── Resource grid ────────────────────────────────────────────────── */}
           {resourcesStatus === "success" && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredResources.length === 0 && resources.length > 0 ? (
+              {filteredResources.length === 0 && (filters.search || filters.verificationStatus !== "all" || filters.resourceType !== "all" || filters.minPrice || filters.maxPrice) ? (
                 <div className="col-span-full py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   No resources match your filters.{" "}
                   <button
@@ -220,7 +201,7 @@ export default function App() {
                     Clear filters
                   </button>
                 </div>
-              ) : resources.length === 0 ? (
+              ) : filteredResources.length === 0 ? (
                 <div className="col-span-full flex flex-col items-center gap-4 py-20 text-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950">
                     <svg
