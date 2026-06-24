@@ -1,5 +1,6 @@
 import rateLimit, { type Options } from "express-rate-limit";
 import type { Request, Response } from "express";
+import { parsePayerFromXPayment } from "../lib/parseXPayment.js";
 
 function rateLimitHandler(_req: Request, res: Response, _next: () => void, options: Options): void {
   const retryAfterSeconds = Math.ceil(options.windowMs / 1000);
@@ -46,11 +47,5 @@ export function extractPayerFromPaymentHeader(req: Request): string | undefined 
   if (!header || typeof header !== "string") {
     return undefined;
   }
-
-  try {
-    const decoded = JSON.parse(Buffer.from(header, "base64").toString());
-    return decoded?.payload?.authorization?.address ?? decoded?.clientAddress ?? undefined;
-  } catch {
-    return undefined;
-  }
+  return parsePayerFromXPayment(header).payer;
 }
