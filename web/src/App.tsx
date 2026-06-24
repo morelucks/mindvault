@@ -53,7 +53,7 @@ const DEFAULT_FILTERS: CatalogFilters = {
 
 export default function App() {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; fallbackUrl?: string } | null>(null);
   const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
   const [overrides, setOverrides] = useState<Record<string, Partial<Resource>>>({});
   const [tab, setTab] = useState<Tab>("catalog");
@@ -88,9 +88,12 @@ export default function App() {
   async function handleCopyUrl(url: string) {
     try {
       await navigator.clipboard.writeText(url);
-      setToast("Resource URL copied to clipboard");
+      setToast({ message: "Resource URL copied to clipboard" });
     } catch {
-      setToast("Failed to copy URL");
+      setToast({
+        message: "Clipboard unavailable — copy the URL below:",
+        fallbackUrl: url,
+      });
     }
   }
 
@@ -496,7 +499,13 @@ export default function App() {
         />
       )}
 
-      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
+      {toast && (
+        <Toast
+          message={toast.message}
+          fallbackUrl={toast.fallbackUrl}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
