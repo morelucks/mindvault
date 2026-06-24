@@ -145,8 +145,23 @@ router.post(
 );
 
 // GET /resources — browse catalog (public)
-router.get("/resources", async (_req, res) => {
-  const catalog = await listCatalog();
+router.get("/resources", async (req, res) => {
+  const catalog = await listCatalog({
+    search: typeof req.query.search === "string" ? req.query.search : undefined,
+    minPrice: typeof req.query.minPrice === "string" ? req.query.minPrice : undefined,
+    maxPrice: typeof req.query.maxPrice === "string" ? req.query.maxPrice : undefined,
+    verificationStatus:
+      req.query.verificationStatus === "pending" ||
+      req.query.verificationStatus === "verified" ||
+      req.query.verificationStatus === "rejected" ||
+      req.query.verificationStatus === "skipped"
+        ? req.query.verificationStatus
+        : undefined,
+    resourceType:
+      req.query.resourceType === "file" || req.query.resourceType === "link"
+        ? req.query.resourceType
+        : undefined,
+  });
   res.json(
     catalog.map((r) => ({
       ...r,

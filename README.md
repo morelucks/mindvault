@@ -64,6 +64,7 @@ Available tools:
 | `mindvault_setup_wallet` | Create a Stellar wallet using the sponsored account protocol | `"Create a wallet for me"` |
 | `mindvault_wallet_info` | Check wallet address and USDC balance | `"What's my wallet balance?"` |
 | `mindvault_browse` | List available resources in the vault | `"Show me what resources are available"` |
+| `mindvault_search` | Search the catalog by keyword, price, type, and verification status | `"Find verified links under 1 USDC"` |
 | `mindvault_preview` | Get details and price for a resource | `"Preview resource swcn98besxpp6t1u8e77fqz3"` |
 | `mindvault_register` | Register as a publisher using the agent's wallet | `"Register me as Alice, alice@example.com"` |
 | `mindvault_publish` | Publish a resource and pay for verification via x402 | `"Publish 'My Dataset' for 5 USDC at https://example.com/data"` |
@@ -186,7 +187,6 @@ The `PAYMENT-REQUIRED` header contains the price, destination wallet, network, a
 
 ## What Is Not Yet Built
 
-- Search and filtering on the catalog
 - Recurring access or time-limited leases (currently per-request)
 - Refund mechanism
 - Rate limiting
